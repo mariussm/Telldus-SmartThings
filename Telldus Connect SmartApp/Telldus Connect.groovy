@@ -66,6 +66,10 @@ def initialize() {
                         log.debug "Calling createChildDevice: ${detail}"
                         createChildDevice("Telldus Sensor", deviceId, detail.name, detail.id)
                         break
+                    case 'switch':
+                        log.debug "Calling createChildDevice: ${detail}"
+                        createChildDevice("Telldus Switch", deviceId, detail.name, detail.id)
+                        break
                     default:
                         log.debug "Unknown type: ${detail.type}"
                 }
@@ -110,7 +114,28 @@ def getDeviceList() {
             state.deviceState[key] = null
             deviceList[key] = "${value.name}"
         }
-
+	}
+    
+    apiGet("api/device") { response -> 
+        log.debug "api/device response: ${response.data}"
+        response.data.device.each { value ->
+            def key = "telldus:${value.id}"
+            log.debug "key: ${key}"
+            state.deviceDetail[key] = [:]
+            state.deviceDetail[key]["name"] = value.name
+            state.deviceDetail[key]["id"] = value.id
+            
+            
+            state.deviceState[key] = null
+            // TODO 19 (dimmer)
+            log.debug "value.methods ${value.methods}"
+            if(value.methods == 3) {
+            	log.debug "adding switch"
+            	state.deviceDetail[key]["type"] = "switch"
+                deviceList[key] = "${value.name}"
+            }
+            
+        }
 	}
 
 	return deviceList.sort() { it.value.toLowerCase() }
@@ -186,57 +211,68 @@ def poll() {
     
     def children = getChildDevices()
     log.debug "State: ${state.deviceState}"
+    
+    // Get state of switches and dimmers
+    def deviceState = [:]
+    apiGet("api/device") { response -> 
+        log.debug "api/device response2: ${response.data}"
+        response.data.device.each { value ->
+            def key = "${value.id}"
+            log.debug "key: ${key}"
+            deviceState[key] = [:]
+            deviceState[key]["state"] = value.state
+            deviceState[key]["id"] = value.id
+            deviceState[key]["statevalue"] = value.statevalue
+        }
+	}
+    log.debug "poll deviceState: ${deviceState}"
 
 	settings.devices.each { deviceId ->
 		def detail = state?.deviceDetail[deviceId]
         if(detail != null) {
             log.debug "poll detail: ${detail}"
 
-            def data = [:]
-            data['Temperature'] = null
-            data['Humidity'] = null
+			if(detail.type == "sensor") {
+                def data = [:]
+                data['Temperature'] = null
+                data['Humidity'] = null
 
-            def httpparams = [:]
-            httpparams['Id'] = detail.id
-            apiGet("api/sensordata", httpparams) { response -> 
-                log.debug "api/sensordata response data: ${response.data}"
-                response.data.data.each { value ->
-                    log.debug "value: ${value}"
-                    if(value.name == "humidity") {
-                        data['Humidity'] = value.value
-                    }
-                    if(value.name == "temp") {
-                        data['Temperature'] = value.value
+                def httpparams = [:]
+                httpparams['Id'] = detail.id
+                apiGet("api/sensordata", httpparams) { response -> 
+                    log.debug "api/sensordata response data: ${response.data}"
+                    response.data.data.each { value ->
+                        log.debug "value: ${value}"
+                        if(value.name == "humidity") {
+                            data['Humidity'] = value.value
+                        }
+                        if(value.name == "temp") {
+                            data['Temperature'] = value.value
+                        }
                     }
                 }
-            /*response.data.sensor.each { value ->
-                def key = "telldus:${value.id}"
-                log.debug "key: ${key}"
-                state.deviceDetail[key] = [:]
-                state.deviceDetail[key]["name"] = value.name
-                state.deviceDetail[key]["id"] = value.id
-                state.deviceDetail[key]["type"] = "sensor"
-                state.deviceState[key] = null
-                deviceList[key] = "${value.name}"
-            */
-            }
 
-
-
-            //def data = state?.deviceState[deviceId] // TODO
-
-            def child = children?.find { it.deviceNetworkId == deviceId }
-
-            log.debug "Update: $child";
-            switch(detail?.type) {
-                case 'sensor':
-                    log.debug "Updating sensor $data"
-                    child?.sendEvent(name: 'temperature', value: cToPref(data['Temperature']) as float, unit: getTemperatureScale())
-                    //child?.sendEvent(name: 'carbonDioxide', value: data['CO2'])
-                    child?.sendEvent(name: 'humidity', value: data['Humidity'])
-                    //child?.sendEvent(name: 'pressure', value: data['Pressure'])
-                    //child?.sendEvent(name: 'noise', value: data['Noise'])
-                    break;
+				log.debug "sensor data: ${data}"
+                def child = children?.find { it.deviceNetworkId == deviceId }
+				child?.sendEvent(name: 'temperature', value: cToPref(data['Temperature']) as float, unit: getTemperatureScale())
+                //child?.sendEvent(name: 'carbonDioxide', value: data['CO2'])
+                child?.sendEvent(name: 'humidity', value: data['Humidity'])
+                //child?.sendEvent(name: 'pressure', value: data['Pressure'])
+                //child?.sendEvent(name: 'noise', value: data['Noise'])
+            } else if(detail.type == "switch") {
+            	log.debug "processing switch ${detail.id}"
+                def child = children?.find { it.deviceNetworkId == deviceId }
+            	if(deviceState[detail.id].state == 1) {
+                	log.debug "switch ${detail.id} is on"
+                    child?.sendEvent(name: 'switch', value: "on")
+                } else {
+                	log.debug "switch ${detail.id} is off"
+                    child?.sendEvent(name: 'switch', value: "off")
+                }
+                
+                //TODO
+            } else {
+            	log.debug "Unknown type: ${detail.type}"
             }
         }
 	}

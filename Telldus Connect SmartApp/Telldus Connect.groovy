@@ -156,8 +156,10 @@ def createChildDevice(deviceFile, dni, name, telldusId) {
 		if(!existingDevice) {
 			log.debug "Creating child"
 			def childDevice = addChildDevice("mariussm", deviceFile, dni, null, [name: name, telldusId: telldusId])
+            childDevice.setTelldusID(telldusId)
 		} else {
 			log.debug "Device $dni already exists"
+            existingDevice.setTelldusID(telldusId)
 		}
 	} catch (e) {
 		log.error "Error creating device2: ${e}"
@@ -204,6 +206,33 @@ def apiGet(String path, Map query, Closure callback) {
 
 def apiGet(String path, Closure callback) {
 	apiGet(path, [:], callback);
+}
+
+
+def apiPost(String path, Map query, Closure callback) {
+	query['ConsumerKey'] = appSettings.ConsumerKey
+    query['ConsumerSecret'] = appSettings.ConsumerSecret
+    query['Token'] = appSettings.Token
+    query['TokenSecret'] = appSettings.TokenSecret
+    
+	def params = [
+		uri: getApiUrl(),
+		path: path,
+		'query': query
+	]
+	// log.debug "API Get: $params"
+
+	try {
+		httpPost(params)	{ response ->
+			callback.call(response)
+		}
+	} catch (Exception e) {
+		log.debug "apiPost: Call failed $e"
+	}
+}
+
+def apiPost(String path, Closure callback) {
+	apiPost(path, [:], callback);
 }
 
 def poll() {
@@ -276,8 +305,22 @@ def poll() {
             }
         }
 	}
+}
+
+def setSwitchState(child, telldusId, state) {
+    def httpparams = [:]
+	httpparams['id'] = telldusId
+    httpparams['state'] = state
+    try {
+        apiPost("api/device", httpparams) { response -> 
+            log.debug "setSwitchState result: temp"
+        }
+    }  catch (Exception e) {
+    }
     
+    child.sendEvent(name: 'switch', value: state)
     
+    //poll()
 }
 
 def cToPref(temp) {

@@ -47,3 +47,8 @@ def parse(String description) {
 def poll() {
 	parent.poll()
 }
+
+def setTelldusID(id) {
+	log.debug "setting telldusid ${id}"
+    state.telldusid = id
+}

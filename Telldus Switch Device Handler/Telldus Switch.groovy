@@ -5,6 +5,8 @@ metadata {
 		capability "Configuration"
 		capability "Polling"
 		capability "Refresh"
+        
+        //attribute "telldusId", "string"
 	}
 
 	simulator {
@@ -40,7 +42,15 @@ def poll() {
 }
 
 def on() {
+	log.debug "TEMP: ${name}"
+	parent.setSwitchState(this, state.telldusid, "on")
 }
 
 def off() {
+	log.debug "TEMP: ${name}"
+	parent.setSwitchState(this, state.telldusid, "off")
+}
+
+def setTelldusID(id) {
+    state.telldusid = id
 }

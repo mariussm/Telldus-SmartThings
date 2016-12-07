@@ -2,7 +2,7 @@
 
 This smartapp uses an API found at https://github.com/mariussm/Telldus-API-wrapper/ which is responsible for OAuth authentication to the Telldus API (which i didn't bother finding out how to do using a smartapp).
 
-Currently only supports temperature/humidity sensors
+Currently only supports temperature/humidity sensors and switches (not dimmers, as I don't have any)
 
 ## Install
 
@@ -21,7 +21,8 @@ $TokenSecret = ""
 $sensors = Invoke-RestMethod "https://apilocation.example.com/api/sensor?ConsumerKey=$ConsumerKey&ConsumerSecret=$ConsumerSecret&Token=Token&TokenSecret=$TokenSecret"
 $sensors.sensor
 ```
-- Install [this](./Telldus Sensor Device Handler/) device handler, which is a regular temperature / humidity sensor. No settings required.
+- Install [this](./Telldus Sensor Device Handler/) device handler. No settings required.
+- Install [this](./Telldus Switch Device Handler/) device handler. No settings required.
 - Install [this](./Telldus Connect SmartApp/) app. In the IDE, go to settings and set the 5 settings (example values):
 
 | Setting        | Example value                             |
